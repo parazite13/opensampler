@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:package_info/package_info.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'padscreen.dart';
 import 'settings.dart';
@@ -17,13 +17,13 @@ import 'settings.dart';
 //==============================================================================
 
 // Global preferences object.
-SharedPreferences preferences;
+late SharedPreferences preferences;
 
 // The directory for that we will be saving to.
-Directory documentDirectory;
+late Directory documentDirectory;
 
 // Information about the app package.
-PackageInfo packageInfo;
+late PackageInfo packageInfo;
 
 // Key used in preferences to store/retrieve path of the last used project.
 const String lastFileKey = "lastProject";
@@ -61,9 +61,9 @@ Future<void> main() async
 
 Future<Settings> loadSettings() async {
 
-  String last = preferences.getString(lastFileKey);
+  String? last = preferences.getString(lastFileKey);
 
-  if (last == null ||  last.isEmpty) {
+  if (last == null || last.isEmpty) {
     String path = documentDirectory.path;
     last = '$path/temp.json';
   }
@@ -82,7 +82,7 @@ Future<Settings> loadSettings() async {
     }
   }
 
-  return defaultSettings;
+  return Settings.defaultSettings;
 }
 
 //==============================================================================

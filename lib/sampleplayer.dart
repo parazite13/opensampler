@@ -14,29 +14,30 @@ class SamplePlayer {
 
   //----------------------------------------------------------------------------
 
-  List<AudioPlayer> _players = [];
-  Settings _settings;
+  List<AudioPlayer?> _players = [];
+  late Settings _settings;
 
   //----------------------------------------------------------------------------
 
-  void init(Settings settings) {
+  void init(Settings settings) async {
 
     _settings = settings;
 
-    for (AudioPlayer player in _players) {
-      if (player != null)
+    for (AudioPlayer? player in _players) {
+      if(player != null){
         player.release();
+      }
     }
 
     _players.clear();
 
     for (PadSettings pad in settings.padSettings) {
-      if (pad.sample != null && pad.sample.isNotEmpty) {
-        AudioPlayer player = AudioPlayer(mode: pad.long ? PlayerMode.MEDIA_PLAYER : PlayerMode.LOW_LATENCY);
-
-        player.setUrl(pad.sample, isLocal: true);
-        player.setReleaseMode(pad.looped ? ReleaseMode.LOOP : ReleaseMode.STOP);
-        player.setVolume(pad.volume);
+      if (pad.sample.isNotEmpty) {
+        AudioPlayer player = AudioPlayer();
+        await player.setPlayerMode(pad.long ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
+        await player.setSource(DeviceFileSource(pad.sample));
+        await player.setReleaseMode(pad.looped ? ReleaseMode.loop : ReleaseMode.stop);
+        await player.setVolume(pad.volume);
 
         _players.add(player);
       }
@@ -50,11 +51,11 @@ class SamplePlayer {
 
   void play(int idx)
   {
-    AudioPlayer player = _players[idx];
+    AudioPlayer? player = _players[idx];
 
     if (player != null) {
 
-      if (player.state == AudioPlayerState.PLAYING) {
+      if (player.state == PlayerState.playing) {
 
         switch (_settings.padSettings[idx].behaviour)
         {
@@ -67,7 +68,7 @@ class SamplePlayer {
             break;
 
           case PressBehaviour.Restart:
-            player.stop();
+            player.seek(Duration.zero);
             player.resume();
             break;
         }
@@ -84,9 +85,10 @@ class SamplePlayer {
 
   void stop() {
 
-    for (AudioPlayer player in _players) {
-      if (player != null)
+    for (AudioPlayer? player in _players) {
+      if (player != null) {
         player.stop();
+      }
     }
 
   }
@@ -95,11 +97,19 @@ class SamplePlayer {
 
   void clear()
   {
-    _settings = null;
-    _players = null;
+    _settings = Settings.defaultSettings;
+    _players = [];
   }
 
   //----------------------------------------------------------------------------
+
+  bool isPlaying(int index){
+    if(index >= _players.length){
+      return false;
+    }
+    AudioPlayer? player = _players[index];
+    return player != null && player.state == PlayerState.playing;
+  }
 }
 
 //==============================================================================

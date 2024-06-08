@@ -8,7 +8,9 @@ import 'dart:io';
 
 import 'package:confirm_dialog/confirm_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:opensampler/midiinputlistener.dart';
 import 'package:path/path.dart';
+import 'package:tinycolor2/tinycolor2.dart';
 
 import 'aboutscreen.dart';
 import 'helpscreen.dart';
@@ -31,6 +33,7 @@ class PadScreen extends StatefulWidget {
 
   final Settings _settings;
   final SamplePlayer _player = SamplePlayer();
+  final MidiInputListener _midiInputListener = MidiInputListener();
 
   //----------------------------------------------------------------------------
 
@@ -39,35 +42,46 @@ class PadScreen extends StatefulWidget {
   //----------------------------------------------------------------------------
 
   @override
-  _PadScreenState createState() => _PadScreenState(_settings, _player);
+  _PadScreenState createState() => _PadScreenState(_settings, _player, _midiInputListener);
 
   //----------------------------------------------------------------------------
 }
 
 //==============================================================================
 
-class _PadScreenState extends State<PadScreen> {
+class _PadScreenState extends State<PadScreen> with TickerProviderStateMixin {
 
   //----------------------------------------------------------------------------
 
-  Settings _settings;
-  SamplePlayer _player;
+  late Settings _settings;
+  late SamplePlayer _player;
+  late MidiInputListener _midiInputListener;
+
+  List animationControllers = [];
 
   //----------------------------------------------------------------------------
 
-  _PadScreenState(Settings settings, SamplePlayer player)
+  _PadScreenState(Settings settings, SamplePlayer player, MidiInputListener midiInputListener)
   {
     this._settings = Settings.copy(settings);
     this._player = player;
+    this._midiInputListener = midiInputListener;
 
     _player.init(_settings);
+    _midiInputListener.init(_settings);
+
+    _midiInputListener.onMidiPadTriggered.stream.listen((pad) {
+      var index = _settings.padSettings.indexOf(pad);
+      _press(index);
+    });
   }
 
   //----------------------------------------------------------------------------
-
   void _press(int idx)
   {
     _player.play(idx);
+    animationControllers[idx].forward(from: 0.0);
+    setState(() { });
   }
 
   //----------------------------------------------------------------------------
@@ -89,16 +103,16 @@ class _PadScreenState extends State<PadScreen> {
 
   //----------------------------------------------------------------------------
 
-  List<MaterialButton> _addButtons(BuildContext context, int amount)
+  List<Widget> _createButtons(BuildContext context, int amount)
   {
-    List<MaterialButton> list = [];
+    double? fontSize;
 
-    double fontSize;
-
-    String prefFont = preferences.getString(fontSizeKey);
+    String? prefFont = preferences.getString(fontSizeKey);
 
     if (prefFont != null && prefFont.isNotEmpty && prefFont != "Default")
       fontSize = double.parse(prefFont);
+
+    List<AnimatedBuilder> padButtonList = [];
 
     for (int i = 0; i < amount; i++) {
 
@@ -107,20 +121,35 @@ class _PadScreenState extends State<PadScreen> {
       if (fontSize != null)
         buttonTextStyle = TextStyle(color: _settings.padSettings[i].textColor, fontSize: fontSize);
       else
-        buttonTextStyle = TextStyle(color: _settings.padSettings[i].textColor);
+        buttonTextStyle = TextStyle(color: _settings.padSettings[i].textColor, fontSize: 12);
 
-      list.add(MaterialButton(
-          onPressed: () {_press(i); },
-          onLongPress: () {
-            _longPress(context, i, _settings.padSettings[i]);
-          },
-          enableFeedback: false,
-          color: _settings.padSettings[i].color,
-          child: Text(_settings.padSettings[i].caption,
-            style: buttonTextStyle)));
+      if(animationControllers.length <= i){
+        animationControllers.add(AnimationController(
+          vsync: this, duration: Duration(milliseconds: 500))
+        );
+      }
+
+      var accentColor = Colors.white;//_settings.padSettings[i].color.toTinyColor().complement().color;
+      var colorTween = ColorTween(begin: accentColor, end: _settings.padSettings[i].color)
+          .animate(animationControllers[i]);
+
+      padButtonList.add(
+        AnimatedBuilder(animation: colorTween, builder: (context, child) =>
+            MaterialButton(
+                onPressed: () {_press(i); },
+                onLongPress: () {
+                  _longPress(context, i, _settings.padSettings[i]);
+                },
+                enableFeedback: false,
+                color: _player.isPlaying(i) ? colorTween.value : _settings.padSettings[i].color,
+                child:
+                Text(_settings.padSettings[i].caption, style: buttonTextStyle)
+            ))
+        );
     }
 
-    return list;
+    return padButtonList;
+
   }
 
   //----------------------------------------------------------------------------
@@ -130,7 +159,7 @@ class _PadScreenState extends State<PadScreen> {
     var ok = await confirm(context, content: Text('This will close current project and create a blank one. Continue?'));
 
     if (ok) {
-      _settings = Settings.copy(defaultSettings);
+      _settings = Settings.copy(Settings.defaultSettings);
       _settings.save();
 
       _player.init(_settings);
@@ -187,13 +216,13 @@ class _PadScreenState extends State<PadScreen> {
     List<File> files = [];
 
     await for (var file in documentDirectory.list(recursive: false, followLinks: false)) {
-      if (file.path.endsWith(".json") && basename(file.path) != "temp.json")
+      if (file is File && file.path.endsWith(".json") && basename(file.path) != "temp.json")
         files.add(file);
     }
 
-    File settingsFile = await Navigator.push(context, MaterialPageRoute(builder: (context) => LoadScreen(files)));
+    File? settingsFile = await Navigator.push(context, MaterialPageRoute(builder: (context) => LoadScreen(files)));
 
-    if (settingsFile != null) {
+    if(settingsFile != null){
       String json = await settingsFile.readAsString();
       _settings = new Settings.fromJson(settingsFile, json);
     }
@@ -286,14 +315,14 @@ class _PadScreenState extends State<PadScreen> {
         ],
       ),
 
-      body: Center(
+      body:  Center(
         child: GridView.extent(
             maxCrossAxisExtent: padWidth,
             childAspectRatio: ratio,
             padding: EdgeInsets.only(left: spacing, right: spacing, top: spacing),
             mainAxisSpacing: spacing,
             crossAxisSpacing: spacing,
-            children: _addButtons(context, _settings.x * _settings.y)),
+            children: _createButtons(context, _settings.x * _settings.y)),
     ));
   }
 

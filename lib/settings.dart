@@ -19,38 +19,23 @@ enum PressBehaviour { Stop, Pause, Restart }
 
 String pressBehaviourToString(PressBehaviour mode)
 {
-  switch (mode)
-  {
-    case PressBehaviour.Stop:
-      return "Stop";
-
-    case PressBehaviour.Pause:
-      return "Pause";
-
-    case PressBehaviour.Restart:
-      return "Restart";
-  }
-
-  return null;
+  return switch (mode) {
+    PressBehaviour.Stop => "Stop",
+    PressBehaviour.Pause => "Pause",
+    PressBehaviour.Restart => "Restart"
+  };
 }
 
 //------------------------------------------------------------------------------
 
 PressBehaviour pressBehaviourFromString(String string)
 {
-  switch (string)
-  {
-    case "Stop":
-      return PressBehaviour.Stop;
-
-    case "Pause":
-      return PressBehaviour.Pause;
-
-    case "Restart":
-      return PressBehaviour.Restart;
-  }
-
-  return PressBehaviour.Restart;
+  return switch (string) {
+    "Stop" => PressBehaviour.Stop,
+    "Pause" => PressBehaviour.Pause,
+    "Restart" => PressBehaviour.Restart,
+    _ => PressBehaviour.Restart
+  };
 }
 
 //==============================================================================
@@ -59,18 +44,19 @@ class PadSettings {
 
   //----------------------------------------------------------------------------
 
-  String sample;
-  String caption;
-  Color color;
-  Color textColor;
-  bool looped;
-  bool long;
+  late String sample;
+  late String caption;
+  late Color color;
+  late Color textColor;
+  late bool looped;
+  late bool long;
+  late int midiPitch;
 
-  PressBehaviour behaviour;
+  late PressBehaviour behaviour;
 
-  double volume;
+  late double volume;
 
-  Settings _settings;
+  late Settings _settings;
 
   //----------------------------------------------------------------------------
 
@@ -82,6 +68,8 @@ class PadSettings {
 
     sample = "";
     caption = "$index";
+
+    midiPitch = 36 + index;
 
     color = Colors.grey;
     color = color.withOpacity(1.0);
@@ -105,6 +93,8 @@ class PadSettings {
 
     this.sample = settings.sample;
     this.caption = settings.caption;
+
+    this.midiPitch = settings.midiPitch;
 
     this.color = settings.color;
     this.color = this.color.withOpacity(1.0);
@@ -131,6 +121,8 @@ class PadSettings {
     color = colorVal != null ? Color(colorVal) : Colors.grey;
     color = color.withOpacity(1.0);
 
+    midiPitch = map["midiPitch"];
+
     int textColorVal = map["textColor"];
     textColor = textColorVal != null ? Color(textColorVal) : Colors.black;
     textColor = textColor.withOpacity(1.0);
@@ -148,6 +140,7 @@ class PadSettings {
   {
     "sample": sample,
     "caption": caption,
+    "midiPitch": midiPitch,
     "color": color.value,
     "textColor": textColor.value,
     "looped": looped,
@@ -172,28 +165,35 @@ class Settings {
 
   //----------------------------------------------------------------------------
 
-  String name;
-  File file;
+  late String name;
+  late File file;
 
-  int x;
-  int y;
+  late int x;
+  late int y;
 
-  List<PadSettings> padSettings;
+  late Map midiInputStates;
+
+  late List<PadSettings> padSettings;
 
   //----------------------------------------------------------------------------
 
-  Settings.temp(String name, int x, int y)
+  static Settings defaultSettings = Settings.temp("Open Sampler", 3,3, Map());
+
+  //----------------------------------------------------------------------------
+
+  Settings.temp(String name, int x, int y, Map midiInputStates)
   {
     this.name = name;
     this.x = x;
     this.y = y;
+    this.midiInputStates = midiInputStates;
 
-    padSettings = []..length = x * y;
+    padSettings = [];
 
     for (int i = 0 ; i < x * y ; i++)
-      padSettings[i] = PadSettings(this, i);
+      padSettings.add(PadSettings(this, i));
 
-    String path = documentDirectory.path;
+    String? path = documentDirectory.path;
     file = File('$path/temp.json');
   }
 
@@ -206,10 +206,15 @@ class Settings {
     this.x = settings.x;
     this.y = settings.y;
 
-    this.padSettings = []..length = x * y;
+    this.midiInputStates = Map();
+    for(var entry in settings.midiInputStates.entries){
+      this.midiInputStates[entry.key] = entry.value;
+    }
+
+    padSettings = [];
 
     for (int i = 0 ; i < x * y ; i++)
-      this.padSettings[i] = PadSettings.copy(settings.padSettings[i]);
+      this.padSettings.add(PadSettings.copy(settings.padSettings[i]));
   }
 
   //----------------------------------------------------------------------------
@@ -223,13 +228,15 @@ class Settings {
     name = map['name'];
     x = map['x'];
     y = map['y'];
+    midiInputStates = map['midiInputs'];
+
 
     List<Map<String, dynamic>> padMap = List.from(map['padSettings']);
 
-    padSettings = []..length = x * y;
+    padSettings = [];
 
     for (int i = 0 ; i < x * y ; i++)
-      padSettings[i] = PadSettings.fromJson(this, padMap[i]);
+      padSettings.add(PadSettings.fromJson(this, padMap[i]));
   }
 
   //----------------------------------------------------------------------------
@@ -240,6 +247,7 @@ class Settings {
     'x': x,
     'y': y,
     'padSettings': List<dynamic>.from(padSettings.map((x) => x)),
+    'midiInputs': midiInputStates,
   };
 
   //----------------------------------------------------------------------------
@@ -274,9 +282,3 @@ class Settings {
 
   //----------------------------------------------------------------------------
 }
-
-//==============================================================================
-
-Settings defaultSettings = Settings.temp("Open Sampler", 3,3);
-
-//==============================================================================

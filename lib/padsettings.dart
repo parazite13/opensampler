@@ -52,12 +52,13 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
 
   void _onSelectSample() async
   {
-    FilePickerResult result = await FilePicker.platform.pickFiles(type: FileType.audio);
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.audio);
 
-    if (result != null)
-      _settings.sample = result.files.single.path;
+    if (result != null) {
+      _settings.sample = result.files.single.path ?? "";
+    }
 
-    bool isNumber = double.parse(_settings.caption) != null;
+    bool isNumber = double.tryParse(_settings.caption) != null;
 
     if (_settings.caption.isEmpty || isNumber)
     {
@@ -74,6 +75,13 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     setState(() {});
   }
 
+  void _onClearSample() async
+  {
+    _settings.sample = "";
+    _settings.save();
+    setState(() {});
+  }
+
   //----------------------------------------------------------------------------
 
   void _onChangeCaption(BuildContext context) async
@@ -85,6 +93,27 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
 
     if (ok)
       _settings.caption = controller.text;
+
+    _settings.save();
+
+    setState(() {});
+  }
+
+  //----------------------------------------------------------------------------
+
+  void _onChangeMidiPitch(BuildContext context) async
+  {
+    TextEditingController controller = TextEditingController();
+    controller.text = _settings.midiPitch.toString();
+
+    var ok = await confirm(context, title: Text('Midi input pitch'), content: TextField(controller: controller));
+
+    if (ok){
+      var value = int.tryParse(controller.text);
+      if(value != null){
+        _settings.midiPitch = value;
+      }
+    }
 
     _settings.save();
 
@@ -123,7 +152,8 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                       children: <Widget>[
                         Text(sampleName),
                         Spacer(),
-                        TextButton(onPressed: _onSelectSample, child: Text("Select"))
+                        TextButton(onPressed: _onSelectSample, child: Text("Select")),
+                        TextButton(onPressed: _onClearSample, child: Text("Clear")),
                       ],
                     ),
                     Divider(),
@@ -133,6 +163,15 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                         Text(caption),
                         Spacer(),
                         TextButton(onPressed: () {_onChangeCaption(context); }, child: Text("Set"))
+                      ],
+                    ),
+                    Divider(),
+                    Text("Midi Pitch:", style: TextStyle(fontSize: 16)),
+                    Row(
+                      children: <Widget>[
+                        Text(_settings.midiPitch.toString()),
+                        Spacer(),
+                        TextButton(onPressed: () {_onChangeMidiPitch(context); }, child: Text("Set"))
                       ],
                     ),
                     Divider(),
@@ -167,10 +206,9 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                     SlidePicker(
                       pickerColor: _settings.color,
                       onColorChanged: (Color color) { _settings.color = color; _settings.save(); },
-                      paletteType: PaletteType.rgb,
                       enableAlpha: false,
                       displayThumbColor: true,
-                      showLabel: false,
+                      labelTypes: [],
                       ),
                     Divider(),
                     Text("Pad Text Color:", style: TextStyle(fontSize: 16)),
@@ -178,10 +216,9 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                     SlidePicker(
                       pickerColor: _settings.textColor,
                       onColorChanged: (Color color) { _settings.textColor = color; _settings.save(); },
-                      paletteType: PaletteType.rgb,
                       enableAlpha: false,
                       displayThumbColor: true,
-                      showLabel: false,
+                      labelTypes: [],
                     ),
                   ]),
             )));
@@ -198,10 +235,12 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
         Spacer(),
         DropdownButton<PressBehaviour>(
           value: _settings.behaviour,
-          onChanged: (PressBehaviour newValue) {
+          onChanged: (PressBehaviour? newValue) {
             setState(() {
-              _settings.behaviour = newValue;
-              _settings.save();
+              if(newValue != null) {
+                _settings.behaviour = newValue;
+                _settings.save();
+              }
             });
           },
           items: PressBehaviour.values.map<DropdownMenuItem<PressBehaviour>>((PressBehaviour value) {

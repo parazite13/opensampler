@@ -5,6 +5,7 @@
 //==============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_midi_command/flutter_midi_command.dart';
 
 import 'main.dart';
 import 'settings.dart';
@@ -46,35 +47,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
   //----------------------------------------------------------------------------
 
   @override
-  Widget build(BuildContext context)
-  {
+  Widget build(BuildContext context) {
     final TextStyle defaultTextStyle = TextStyle(fontSize: 20);
 
     xAmount = _settings.x;
     yAmount = _settings.y;
 
-    return Scaffold(
-
-      appBar: AppBar(
-        title: Text("Settings"),
-      ),
-        body: Container(
-            margin: const EdgeInsets.all(20.0),
-            child: Center(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center,
-                  // <Widget> is the type of items in the list.
-                  children: <Widget>[
-                    Spacer(),
-                    Row(children: <Widget>[Text("Project Settings:", style: defaultTextStyle), Spacer()]),
-                    _buildHorizontalAmountCombo(context),
-                    _buildVerticalAmountCombo(context),
-                    Spacer(),
-                    Row(children: <Widget>[Text("Global Settings:", style: defaultTextStyle), Spacer()]),
-                    _buildFontCombo(context),
-                    Spacer(),
-                  ]),
-            )));
+    return FutureBuilder(
+        future: MidiCommand().devices,
+        builder: (context, snapshot) {
+          if(snapshot.hasData){
+            return Scaffold(
+                appBar: AppBar(
+                  title: Text("Settings"),
+                ),
+                body: SingleChildScrollView(
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Row(children: <Widget>[Text("Pad Layout:", style: defaultTextStyle), Spacer()]),
+                            _buildHorizontalAmountCombo(context),
+                            _buildVerticalAmountCombo(context),
+                            Row(children: <Widget>[Text("Midi Inputs:", style: defaultTextStyle), Spacer()]),
+                            Column(children:
+                              _buildMidiInputCheckboxes(context, snapshot.data),
+                            ),
+                            Row(children: <Widget>[Text("Global Settings:", style: defaultTextStyle), Spacer()]),
+                            _buildFontCombo(context),
+                          ]
+                      ),
+                )
+            );
+          }else{
+            return Scaffold(
+                appBar: AppBar(
+                  title: Text("Settings"),
+                ),
+                body: SingleChildScrollView(
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Row(children: <Widget>[Text("Pad Layout:", style: defaultTextStyle), Spacer()]),
+                            _buildHorizontalAmountCombo(context),
+                            _buildVerticalAmountCombo(context),
+                            Row(children: <Widget>[Text("Midi Inputs:", style: defaultTextStyle), Spacer()]),
+                            CircularProgressIndicator(),
+                            Row(children: <Widget>[Text("Global Settings:", style: defaultTextStyle), Spacer()]),
+                            _buildFontCombo(context)
+                          ]
+                      ),
+                )
+            );
+          }
+        });
   }
+
 
   //----------------------------------------------------------------------------
 
@@ -87,11 +114,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Spacer(),
         DropdownButton<int>(
           value: xAmount,
-          onChanged: (int newValue) {
+          onChanged: (int? newValue) {
             setState(() {
-              xAmount = newValue;
-              _settings.x = xAmount;
-              _settings.save();
+              if(newValue != null){
+                xAmount = newValue;
+                _settings.x = xAmount;
+                _settings.save();
+              }
             });
           },
           items: <int>[
@@ -116,6 +145,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   //----------------------------------------------------------------------------
 
+  List<Row> _buildMidiInputCheckboxes(BuildContext context, List<MidiDevice>? midiDevices)
+  {
+    return
+        midiDevices!.map((e) =>
+          Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(e.name),
+                Spacer(),
+                Checkbox(value: _settings.midiInputStates.containsKey(e.name) ? _settings.midiInputStates[e.name] : false, onChanged: (bool? newValue){
+                  setState(() {
+                    _settings.midiInputStates[e.name] = newValue;
+                    _settings.save();
+                  });
+                })
+              ]
+          ),
+        ).toList();
+  }
+
+  //----------------------------------------------------------------------------
+
   Row _buildVerticalAmountCombo(BuildContext context)
   {
     return Row(
@@ -125,11 +176,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Spacer(),
         DropdownButton<int>(
           value: yAmount,
-          onChanged: (int newValue) {
+          onChanged: (int? newValue) {
             setState(() {
-              yAmount = newValue;
-              _settings.y = yAmount;
-              _settings.save();
+              if(newValue != null){
+                yAmount = newValue;
+                _settings.y = yAmount;
+                _settings.save();
+              }
             });
           },
           items: <int>[
@@ -158,7 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   {
     // TODO This might be better if it used an enum.
 
-    String prefFont = preferences.getString(fontSizeKey);
+    String? prefFont = preferences?.getString(fontSizeKey);
 
     if (prefFont == null || prefFont.isEmpty)
       prefFont = "Default";
@@ -170,10 +223,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Spacer(),
         DropdownButton<String>(
           value: prefFont,
-          onChanged: (String newValue) {
+          onChanged: (String? newValue) {
             setState(() {
-              fontValue = newValue;
-              preferences.setString(fontSizeKey, newValue);
+              if(newValue != null){
+                fontValue = newValue;
+                preferences?.setString(fontSizeKey, newValue);
+              }
             });
           },
           items: <String>[

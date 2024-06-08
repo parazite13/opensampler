@@ -31,12 +31,12 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "eu.cherrytree.opensampler"
-        minSdkVersion 23
-        targetSdkVersion 30
+        minSdkVersion 25
+        targetSdkVersion 31
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
